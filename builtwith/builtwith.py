@@ -31,12 +31,19 @@ TECH_FILES = {
 }
 
 def connect():
+#  conn = psycopg2.connect(
+#    host='ec2-107-22-197-152.compute-1.amazonaws.com',
+#    port='5432',
+#    dbname='depknnu35jckv7',
+#    user='chlmacwxinnmav',
+#    password='FqoY76fonBofwZmGO-9YwlqtbH'
+#  )
   conn = psycopg2.connect(
-    host='ec2-107-22-197-152.compute-1.amazonaws.com',
+    host='104.199.143.144',
     port='5432',
-    dbname='depknnu35jckv7',
-    user='chlmacwxinnmav',
-    password='FqoY76fonBofwZmGO-9YwlqtbH'
+    dbname='postgres',
+    user='postgres',
+    password='dUsa4iom'
   )
   cursor = conn.cursor()
   return conn, cursor
@@ -97,7 +104,7 @@ def valid_int(value):
 
 def valid_date(value):
   try:
-    datetime.datetime.strptime(value)
+    datetime.datetime.strptime(value, '%m/%d/%Y')
     return value
   except ValueError:
     return None
@@ -141,7 +148,7 @@ def import_file(filename, tech):
   conn.close()
 
 def main():
-  drop_table()
+  #drop_table()
   create_table()
   for filename, tech in TECH_FILES.iteritems():
     import_file(filename, tech)
