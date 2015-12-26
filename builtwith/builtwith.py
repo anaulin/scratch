@@ -130,8 +130,7 @@ def import_file(filename, tech):
     reader = csv.reader(csvfile)
     row_count = 0
     for row in reader:
-      if row_count == 0:
-        row_count += 1
+      if not row[0] or row[0] == 'Domain':
         continue
       data = {
         'domain': row[0],
