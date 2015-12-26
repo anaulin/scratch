@@ -67,7 +67,7 @@ def drop_table():
   conn.close()
   print 'Dropped table'
 
-def upsert_row(data, cursor):
+def upsert_row(tech, data, cursor):
   SELECT_SQL = """SELECT domain FROM builtwith where domain = %s"""
   cursor.execute(SELECT_SQL, [data['domain']])
   result = cursor.fetchall()
@@ -87,6 +87,18 @@ def upsert_row(data, cursor):
       %(alexa)s, %(first_indexed)s, %(last_indexed)s, %(tech)s,
       %(first_detected)s, %(last_found)s)"""
     cursor.execute(INSERT_SQL, data)
+
+def valid_int(value):
+  try:
+    return int(value)
+  except ValueError:
+    return None
+
+def valid_date(value):
+  if value = 'N/A':
+    return None
+  else:
+    return value
 
 def import_file(filename, tech):
   print 'Importing: %s as tech %s' % (filename, tech)
@@ -114,14 +126,14 @@ def import_file(filename, tech):
         'domain': row[0],
         'tech': True,
         'vertical': row[4],
-        'quantcast': row[5],
-        'alexa': row[6],
-        'first_detected': row[24],
-        'last_found': row[25],
-        'first_indexed': row[26],
-        'last_indexed': row[27]
+        'quantcast': valid_int(row[5]),
+        'alexa': valid_int(row[6]),
+        'first_detected': valid_date(row[24]),
+        'last_found': valid_date(row[25]),
+        'first_indexed': valid_date(row[26]),
+        'last_indexed': valid_date(row[27])
       }
-      upsert_row(data, cursor)
+      upsert_row(tech, data, cursor)
       conn.commit()
   cursor.close()
   conn.close()
