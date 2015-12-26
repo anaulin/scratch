@@ -1,7 +1,7 @@
 # Script to import some BuiltWith exports into a Postgres DB
 
 import csv
-import datetime
+import dateutil
 import psycopg2
 
 DIR_PREFIX = ('/Users/anaulin/builtwith-exports/')
@@ -104,7 +104,7 @@ def valid_int(value):
 
 def valid_date(value):
   try:
-    datetime.datetime.strptime(value, '%m/%d/%Y')
+    dateutil.parser.parse(value)
     return value
   except ValueError:
     return None
@@ -126,10 +126,10 @@ def import_file(filename, tech):
   # Insert all data
   with open(DIR_PREFIX + filename, 'rU') as csvfile:
     reader = csv.reader(csvfile)
-    first_row = True
+    row_count = 0
     for row in reader:
-      if first_row:
-        first_row = False
+      if row_count == 0:
+        row_count += 1
         continue
       data = {
         'domain': row[0],
@@ -143,12 +143,15 @@ def import_file(filename, tech):
         'last_indexed': valid_date(row[27])
       }
       upsert_row(tech, data, cursor)
-      conn.commit()
+      row_count += 1
+      if row_count % 100 == 0:
+        conn.commit()
+  conn.commit()
   cursor.close()
   conn.close()
 
 def main():
-  #drop_table()
+  drop_table()
   create_table()
   for filename, tech in TECH_FILES.iteritems():
     import_file(filename, tech)
