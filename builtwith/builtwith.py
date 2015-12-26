@@ -1,6 +1,7 @@
 # Script to import some BuiltWith exports into a Postgres DB
 
 import csv
+import datetime
 import psycopg2
 
 DIR_PREFIX = ('/Users/anaulin/builtwith-exports/')
@@ -95,10 +96,11 @@ def valid_int(value):
     return None
 
 def valid_date(value):
-  if value = 'N/A':
-    return None
-  else:
+  try:
+    datetime.datetime.strptime(value)
     return value
+  except ValueError:
+    return None
 
 def import_file(filename, tech):
   print 'Importing: %s as tech %s' % (filename, tech)
