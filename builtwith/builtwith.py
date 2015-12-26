@@ -90,7 +90,6 @@ def upsert_row(data, cursor):
 
 def import_file(filename, tech):
   print 'Importing: %s as tech %s' % (filename, tech)
-  return
   conn, cursor = connect()
   # Create columns for this tech
   tech_column = "ALTER TABLE builtwith ADD COLUMN %s boolean" % tech
@@ -128,8 +127,8 @@ def import_file(filename, tech):
   conn.close()
 
 def main():
-  #drop_table()
-  #create_table()
+  drop_table()
+  create_table()
   for filename, tech in TECH_FILES.iteritems():
     import_file(filename, tech)
 
