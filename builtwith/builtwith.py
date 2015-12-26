@@ -1,7 +1,7 @@
 # Script to import some BuiltWith exports into a Postgres DB
 
 import csv
-import dateutil
+import dateutil.parser
 import psycopg2
 
 DIR_PREFIX = ('/Users/anaulin/builtwith-exports/')
@@ -103,6 +103,8 @@ def valid_int(value):
     return None
 
 def valid_date(value):
+  if not value:
+    return None
   try:
     dateutil.parser.parse(value)
     return value
