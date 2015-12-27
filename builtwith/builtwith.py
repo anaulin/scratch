@@ -70,6 +70,13 @@ def drop_table():
 
 def upsert_rows(tech, data, cursor):
   print '.'
+  UPSERT_SQL = """ WITH upd AS (
+    UPDATE builtwith b
+    SET (%s, first_detected_%s, last_found_%s)
+  """ % (tech, tech, tech)
+  UPSERT_SQL += """ WHERE b.domain = %(domain)s)"""
+  UPSERT_SQL += """
+  """
   INSERT_SQL = """INSERT INTO builtwith (domain, vertical, quantcast,
     alexa, first_indexed, last_indexed, %s, first_detected_%s,
     last_found_%s) """ % (tech, tech, tech)
@@ -79,7 +86,10 @@ def upsert_rows(tech, data, cursor):
   INSERT_SQL += """ ON CONFLICT DO UPDATE SET (%s, first_detected_%s,
         last_found_%s) """ % (tech, tech, tech)
   INSERT_SQL += """  = (%(tech)s, %(first_detected)s, %(last_found)s)"""
-  cursor.execute(INSERT_SQL, data)
+  print INSERT_SQL
+  print len(data)
+  print data[0]
+  cursor.executemany(INSERT_SQL, data)
 
 def valid_int(value):
   try:
@@ -111,7 +121,7 @@ def import_file(filename, tech):
     cursor.execute(last_found_column)
     conn.commit()
   except:
-    print 'Columns for tech %s already exist. Not creating.'
+    print 'Columns for tech %s already exist. Not creating.' % tech
     conn.commit()
 
   # Insert all data from file
