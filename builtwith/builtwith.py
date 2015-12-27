@@ -69,7 +69,7 @@ def drop_table():
   print 'Dropped table'
 
 def upsert_rows(tech, data, cursor):
-  print 'Upserting domain: %s ' % data['domain']
+  print '.'
   INSERT_SQL = """INSERT INTO builtwith (domain, vertical, quantcast,
     alexa, first_indexed, last_indexed, %s, first_detected_%s,
     last_found_%s) """ % (tech, tech, tech)
@@ -114,8 +114,7 @@ def import_file(filename, tech):
     print 'Columns for tech %s already exist. Not creating.'
     conn.commit()
 
-
-  # Insert all data
+  # Insert all data from file
   with open(DIR_PREFIX + filename, 'rU') as csvfile:
     reader = csv.reader(csvfile)
     data = []
@@ -134,7 +133,7 @@ def import_file(filename, tech):
         'last_indexed': valid_date(row[27])
       })
       if len(data) == 1000:
-        upsert_row(tech, data, cursor)
+        upsert_rows(tech, data, cursor)
         conn.commit()
         data = []
   conn.commit()
@@ -142,8 +141,8 @@ def import_file(filename, tech):
   conn.close()
 
 def main():
-  for filename, tech in TECH_FILES.iteritems():
-    import_file(filename, tech)
+  #for filename, tech in TECH_FILES.iteritems():
+  import_file('Survey - Mailchimp.csv', 'mailchimp')
 
 
 if __name__ == "__main__":
