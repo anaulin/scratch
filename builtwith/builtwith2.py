@@ -108,7 +108,7 @@ def create_table():
   print 'Creating table'
   CREATE_SQL = "CREATE TABLE " + TABLE
   CREATE_SQL += """ (
-    domain           varchar(200) PRIMARY_KEY,
+    domain           varchar(200) PRIMARY KEY,
     vertical         varchar(300),
     quantcast        int,
     alexa            int,
