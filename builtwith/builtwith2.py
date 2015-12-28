@@ -180,8 +180,11 @@ def main():
   data = {}
   # 1. Process all files and built unified dictionary with data.
   for filename, tech in TECH_FILES.iteritems():
+    print datetime.datetime.now()
+    sys.stdout.flush()
     data.update(process_file(filename, tech))
     print 'Data rows: %s' % (len(data.keys()))
+    sys.stdout.flush()
 
   # 2. Create the table and columns.
   drop_table()
