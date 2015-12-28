@@ -49,7 +49,7 @@ for t in TECH:
   DATA_TEMPLATE['first_detected_%s' % t] = None
   DATA_TEMPLATE['last_found_%s' % t] = None
 
-TABLE = 'builtwith2'
+TABLE = 'builtwith'
 
 def build_insert_sql():
   tech_cols = TECH_FILES.values()
@@ -190,9 +190,9 @@ def main():
   # 3. Insert the data into the DB in batches
   conn, cursor = connect()
   batch_size = 5000
-  batch = []
   print 'Inserting rows in batches'
   sys.stdout.flush()
+  batch = []
   for domain in data.keys():
     batch.append(data[domain])
     if (len(batch)) == batch_size:
@@ -203,6 +203,15 @@ def main():
       batch = []
       print datetime.datetime.now(), ' done'
       sys.stdout.flush()
+  print 'Inserting final partial batch...'
+  sys.stdout.flush()
+  if batch:
+    print datetime.datetime.now()
+    sys.stdout.flush()
+    insert_batch(batch, cursor)
+    conn.commit()
+    print datetime.datetime.now(), ' done'
+    sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
