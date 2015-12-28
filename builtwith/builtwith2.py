@@ -4,7 +4,9 @@ import csv
 import datetime
 import dateutil.parser
 import psycopg2
+import signal
 import sys
+
 
 DIR_PREFIX = ('/Users/anaulin/builtwith-exports/')
 # A map from a csv filename to the column name for its technology
@@ -49,7 +51,38 @@ for t in TECH:
 
 TABLE = 'builtwith2'
 
+def build_insert_sql():
+  tech_cols = TECH_FILES.values()
+  first_detected_cols = ['first_detected_%s' % (t) for t in tech_cols]
+  last_found_cols = ['last_found_%s' % (t) for t in tech_cols]
+
+  INSERT_SQL = """INSERT INTO %s (domain, vertical, quantcast,
+    alexa, first_indexed, last_indexed, """ % TABLE
+  INSERT_SQL += ', '.join(tech_cols)
+  INSERT_SQL += ', '
+  INSERT_SQL += ', '.join(first_detected_cols)
+  INSERT_SQL += ', '
+  INSERT_SQL += ', '.join(last_found_cols)
+  INSERT_SQL += ") VALUES "
+  return INSERT_SQL
 INSERT_SQL = build_insert_sql()
+
+def build_values_sql():
+  tech_cols = TECH_FILES.values()
+  first_detected_cols = ['first_detected_%s' % (t) for t in tech_cols]
+  last_found_cols = ['last_found_%s' % (t) for t in tech_cols]
+
+  VALUES_SQL = """(%(domain)s, %(vertical)s, %(quantcast)s,
+    %(alexa)s, %(first_indexed)s, %(last_indexed)s, """
+  VALUES_SQL += ', '.join(['%(' + t + ')s' for t in tech_cols])
+  VALUES_SQL += ', '
+  VALUES_SQL += ', '.join(['%(first_detected_' + t + ')s' 
+    for t in tech_cols])
+  VALUES_SQL += ', '
+  VALUES_SQL += ', '.join(['%(last_found_' + t + ')s' for t in tech_cols])
+  VALUES_SQL += ")"
+  return VALUES_SQL
+VALUES_SQL = build_values_sql()
 
 def connect():
   conn = psycopg2.connect(
@@ -100,29 +133,6 @@ def create_columns(cursor):
     COLUMNS += " ADD COLUMN last_found_" + t + " date"
     cursor.execute(COLUMNS, (t, t, t))
 
-def build_insert_sql():
-  tech_cols = TECH_FILES.values()
-  first_detected_cols = ['first_detected_%s' % (t) for t in tech_cols]
-  last_found_cols = ['last_found_%s' % (t) for t in tech_cols]
-
-  INSERT_SQL = """INSERT INTO %s (domain, vertical, quantcast,
-    alexa, first_indexed, last_indexed, """ % TABLE
-  INSERT_SQL += ', '.join(tech_cols)
-  INSERT_SQL += ', '
-  INSERT_SQL += ', '.join(first_detected_cols)
-  INSERT_SQL += ', '
-  INSERT_SQL += ', '.join(last_found_cols)
-  INSERT_SQL += """) VALUES (%(domain)s, %(vertical)s, %(quantcast)s,
-    %(alexa)s, %(first_indexed)s, %(last_indexed)s, """
-  INSERT_SQL += ', '.join(['%(' + t + ')s' for t in tech_cols])
-  INSERT_SQL += ', '
-  INSERT_SQL += ', '.join(['%(first_detected_' + t + ')s' 
-    for t in tech_cols])
-  INSERT_SQL += ', '
-  INSERT_SQL += ', '.join(['%(last_found_' + t + ')s' for t in tech_cols])
-  INSERT_SQL += ")"
-  return INSERT_SQL
-
 def valid_int(value):
   try:
     return int(value)
@@ -161,13 +171,17 @@ def process_file(filename, tech):
       data[datum['domain']] = datum
     return data
 
+def insert_batch(batch, cursor):
+  args_str = ', '.join(cursor.mogrify(VALUES_SQL, data) for data in batch)
+  cursor.execute(INSERT_SQL + args_str)
+
 def main():
+  signal.signal(signal.SIGINT, signal.SIG_DFL)
   data = {}
   # 1. Process all files and built unified dictionary with data.
   for filename, tech in TECH_FILES.iteritems():
     data.update(process_file(filename, tech))
     print 'Data rows: %s' % (len(data.keys()))
-    sys.stdout.flush()
 
   # 2. Create the table and columns.
   drop_table()
@@ -175,16 +189,19 @@ def main():
 
   # 3. Insert the data into the DB in batches
   conn, cursor = connect()
-  batch_size = 500
+  batch_size = 5000
   batch = []
   print 'Inserting rows in batches'
+  sys.stdout.flush()
   for domain in data.keys():
-    batch.append[data[domain]]
+    batch.append(data[domain])
     if (len(batch)) == batch_size:
-      cursor.executemany(INSERT_SQL, batch)
+      print datetime.datetime.now()
+      sys.stdout.flush()
+      insert_batch(batch, cursor)
       conn.commit()
       batch = []
-      print datetime.datetime.now()
+      print datetime.datetime.now(), ' done'
       sys.stdout.flush()
 
 if __name__ == "__main__":
