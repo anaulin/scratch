@@ -31,7 +31,7 @@ TECH_FILES = {
   'Payment - Stripe.csv' : 'stripe',
   'Survey - Mailchimp.csv' : 'mailchimp',
   'Survey - Qualaroo.csv' : 'qualaroo',
-  'Survey - Wufoo.csv' : 'wufoo'
+  'Survey - Wufoo.csv' : 'wufoo',
 }
 
 TECH = TECH_FILES.values()
@@ -153,11 +153,14 @@ def process_file(filename, tech):
   with open(DIR_PREFIX + filename, 'rU') as csvfile:
     reader = csv.reader(csvfile)
     data = {}
+    malformed_rows = 0
     for row in reader:
-      if not row[0] or row[0] == 'Domain':
+      if row[0] == 'Domain':
         continue
-      datum = DATA_TEMPLATE.copy()
-      datum.update({
+      if not row[0] or not row[0].strip():
+        malformed_rows += 1
+        continue
+      datum = {
         'domain': row[0],
         tech : True,
         'vertical': row[4],
@@ -167,23 +170,40 @@ def process_file(filename, tech):
         'last_found_%s' % tech: valid_date(row[25]),
         'first_indexed': valid_date(row[26]),
         'last_indexed': valid_date(row[27])
-      })
+      }
       data[datum['domain']] = datum
+    print '%s: rows: %s' % (tech, len(data.keys()))
+    print '%s: malformed rows skipped: %s' % (tech, malformed_rows)
+    sys.stdout.flush()
     return data
 
-def insert_batch(batch, cursor):
+def insert_batch(batch, cursor, conn):
   args_str = ', '.join(cursor.mogrify(VALUES_SQL, data) for data in batch)
+  print datetime.datetime.now()
+  sys.stdout.flush()
   cursor.execute(INSERT_SQL + args_str)
+  conn.commit()
+  print datetime.datetime.now(), ' done'
+  sys.stdout.flush()
+
+def merge_data(new_data, merged_data):
+  for domain, datum in new_data.iteritems():
+    if domain in merged_data:
+      merged_data[domain].update(datum)
+    else:
+      merged_data[domain] = datum
+  return merged_data
 
 def main():
   signal.signal(signal.SIGINT, signal.SIG_DFL)
-  data = {}
+  merged_data = {}
   # 1. Process all files and built unified dictionary with data.
   for filename, tech in TECH_FILES.iteritems():
     print datetime.datetime.now()
     sys.stdout.flush()
-    data.update(process_file(filename, tech))
-    print 'Data rows: %s' % (len(data.keys()))
+    new_data = process_file(filename, tech)
+    merged_data = merge_data(new_data, merged_data)
+    print 'Merged data rows: %s' % (len(merged_data.keys()))
     sys.stdout.flush()
 
   # 2. Create the table and columns.
@@ -196,25 +216,18 @@ def main():
   print 'Inserting rows in batches'
   sys.stdout.flush()
   batch = []
-  for domain in data.keys():
-    batch.append(data[domain])
+  for domain in merged_data.keys():
+    # Pad the dict with None for keys where there is no data.
+    padded_data = DATA_TEMPLATE.copy()
+    padded_data.update(merged_data[domain])
+    batch.append(padded_data)
     if (len(batch)) == batch_size:
-      print datetime.datetime.now()
-      sys.stdout.flush()
-      insert_batch(batch, cursor)
-      conn.commit()
+      insert_batch(batch, cursor, conn)
       batch = []
-      print datetime.datetime.now(), ' done'
-      sys.stdout.flush()
   print 'Inserting final partial batch...'
   sys.stdout.flush()
   if batch:
-    print datetime.datetime.now()
-    sys.stdout.flush()
-    insert_batch(batch, cursor)
-    conn.commit()
-    print datetime.datetime.now(), ' done'
-    sys.stdout.flush()
+    insert_batch(batch, cursor, conn)
 
 if __name__ == "__main__":
     main()
