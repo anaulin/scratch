@@ -1,1 +1,1 @@
-Private code scratch stuff.
+Code scratch repo.
