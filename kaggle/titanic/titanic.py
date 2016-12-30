@@ -45,6 +45,19 @@ def add_family_id(data):
   family_ids = data.apply(get_family_id, axis=1)
   data["FamilyId"] = family_ids
 
+def add_cabin_type(data):
+  # Fill in missing cabins with cabin 'C', because it is the most frequent of
+  # the available ones.
+  cabinCodes = data["Cabin"].fillna("C").apply(lambda cabin: cabin[0])
+  mapping = {}
+  idx = 0
+  for code in cabinCodes.unique():
+    mapping[code] = idx
+    idx += 1
+  for k, v in mapping.items():
+    cabinCodes[cabinCodes == k] = v
+  data["CabinCode"] = cabinCodes
+
 def cleanup_data(data):
     # Add missing values -- set to median of existing values.
     data["Age"] = data["Age"].fillna(data["Age"].median())
@@ -61,6 +74,7 @@ def cleanup_data(data):
     data["NameLength"] = data["Name"].apply(lambda x: len(x))
     add_title(data)
     add_family_id(data)
+    add_cabin_type(data)
 
 def select_features(data):
   selector = SelectKBest(chi2, k=10)
@@ -121,15 +135,16 @@ if __name__ == '__main__':
   algos = [
     GradientBoostingClassifier(random_state=1, n_estimators=9, max_depth=3),
     LogisticRegression(random_state=1),
+    # Two RFC as a way to give them more weight.
+    RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1),
     RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1),
     ExtraTreesClassifier(n_estimators=10, max_depth=13, min_samples_split=16, random_state=1),
     AdaBoostClassifier(n_estimators=100),
-    GaussianNB(),
-    svm.SVC(probability=True, random_state=1)
+    #GaussianNB(),
+    #svm.SVC(probability=True, random_state=1)
   ]
 
-  for algo in algos:
-    test_algo(titanic, algo, features)
+  #test_algo(titanic, algo, features)
   ensemble_predictions = ensemble(titanic, algos, features)
   print "Ensemble accuracy:", get_accuracy(ensemble_predictions, titanic)
 
