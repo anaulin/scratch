@@ -45,6 +45,34 @@ def add_family_id(data):
   family_ids = data.apply(get_family_id, axis=1)
   data["FamilyId"] = family_ids
 
+def add_parent(data):
+  def get_parent(row):
+    if row["Adult"] == 1 and row["Parch"] > 0:
+      return 1
+    return 0
+  parents = data.apply(get_parent, axis=1)
+  data["Parent"] = parents
+
+def add_parent_gender(data):
+  def get_parent_gender(row):
+    if row["Parent"]:
+      if row["Sex"] == 0:
+        return 1
+      else:
+        return 2
+    else:
+      return 0
+  parents_gender = data.apply(get_parent_gender, axis=1)
+  data["ParentGender"] = parents_gender
+
+def add_parent_class(data):
+  def get_parent_class(row):
+    if row["Parent"]:
+      return row["Pclass"]
+    else:
+      return 0
+  data["ParentClass"] = data.apply(get_parent_class, axis=1)
+
 def add_cabin_type(data):
   # Fill in missing cabins with cabin 'C', because it is the most frequent of
   # the available ones.
@@ -72,9 +100,13 @@ def cleanup_data(data):
     # Add features
     data["FamilySize"] = data["SibSp"] + data["Parch"]
     data["NameLength"] = data["Name"].apply(lambda x: len(x))
+    data["Adult"] = data["Age"].apply(lambda x: 1 if x > 14 else 0)
     add_title(data)
     add_family_id(data)
     add_cabin_type(data)
+    add_parent(data)
+    add_parent_gender(data)
+    add_parent_class(data)
 
 def select_features(data):
   selector = SelectKBest(chi2, k=10)
@@ -126,32 +158,36 @@ def train_full_and_predict(training_data, test_data, features, algo):
   reduce_to_decision(predictions)
   return pandas.Series(predictions.astype(int))
 
+def make_submission_file(algo, features):
+  titanic_test = pandas.read_csv("titanic_test.csv")
+  cleanup_data(titanic_test)
+  predictions = train_full_and_predict(titanic, titanic_test, features, algo)
+  submission = pandas.DataFrame({"PassengerId": titanic_test["PassengerId"], "Survived": predictions})
+  submission.to_csv("kaggle.csv", index=False)
+
+
 if __name__ == '__main__':
   titanic = pandas.read_csv("train.csv")
   cleanup_data(titanic)
+  print titanic.head()
   features = select_features(titanic)
   print "Selected features:", features
   # A selection of classifiers to try out. Parameters a little tuned, except for SVM.
   algos = [
     GradientBoostingClassifier(random_state=1, n_estimators=9, max_depth=3),
     LogisticRegression(random_state=1),
-    # Two RFC as a way to give them more weight.
-    RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1),
     RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1),
     ExtraTreesClassifier(n_estimators=10, max_depth=13, min_samples_split=16, random_state=1),
     AdaBoostClassifier(n_estimators=100),
-    #GaussianNB(),
-    #svm.SVC(probability=True, random_state=1)
+    GaussianNB(),
+    svm.SVC(probability=True, random_state=1)
   ]
 
-  #test_algo(titanic, algo, features)
-  ensemble_predictions = ensemble(titanic, algos, features)
-  print "Ensemble accuracy:", get_accuracy(ensemble_predictions, titanic)
-
   # Looks like our RandomForestClassifier works best, standalone. Use that for final submission.
-  titanic_test = pandas.read_csv("titanic_test.csv")
-  cleanup_data(titanic_test)
-  predictions = train_full_and_predict(titanic, titanic_test, features,
-    RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1))
-  submission = pandas.DataFrame({"PassengerId": titanic_test["PassengerId"], "Survived": predictions})
-  submission.to_csv("kaggle.csv", index=False)
+  # Best so far: algo = RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1)
+  gb = GradientBoostingClassifier(random_state=1, n_estimators=10, max_depth=3)
+  rf = RandomForestClassifier(n_estimators=13, max_depth=11, min_samples_split=2, random_state=1)
+  lr = LogisticRegression(random_state=1)
+  algo = VotingClassifier(estimators=[('gb', gb), ('rf', rf), ('lr', lr)], voting='soft')
+  test_algo(titanic, algo, features)
+  make_submission_file(algo, features)
